@@ -86,11 +86,11 @@ public class Utils {
 	 * 获取网络信号以及接入方式
 	 */
 	@SuppressLint("NewApi")
-	public static  String getApnAndSignalStrength(TraceActivity context) throws Exception {
+	public static  String getApnAndSignalStrength(Context context) throws Exception {
 		
 		String networkType = "";
 		String signalStrength = "";
-		
+		String networkSpeed = "";
 		ConnectivityManager conManager = 
 		(ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
 		NetworkInfo ni = conManager.getActiveNetworkInfo(); 
@@ -101,18 +101,22 @@ public class Utils {
 				&& ni.getType() == ConnectivityManager.TYPE_WIFI) {
 			networkType = "wifi";
 			WifiManager wifiManager = (WifiManager)context.getSystemService(Context.WIFI_SERVICE);
-			int linkSpeed = wifiManager.getConnectionInfo().getRssi();
-			signalStrength = String.valueOf(linkSpeed);
+			int signalLevel = WifiManager.calculateSignalLevel(wifiManager.getConnectionInfo().getRssi(), 5);
+            //wifi速度
+            int speed = wifiManager.getConnectionInfo().getLinkSpeed();
+			signalStrength = String.valueOf(signalLevel);
+			networkSpeed = String.valueOf(speed);
 		}else
 		{
 			networkType = ni.getExtraInfo();
 			TelephonyManager telephonyManager =        (TelephonyManager)context.getSystemService(Context.TELEPHONY_SERVICE);
 			CellInfoGsm cellinfogsm = (CellInfoGsm)telephonyManager.getAllCellInfo().get(0);
 			CellSignalStrengthGsm cellSignalStrengthGsm = cellinfogsm.getCellSignalStrength();
+			
 			signalStrength = String.valueOf(cellSignalStrengthGsm.getDbm());
 		}
-		Log.i("xxxxxx",networkType + " : " + signalStrength);
-		return networkType + " : " + signalStrength;
+		
+		return "网络接入类型： " + networkType + " \n  信号强队：" + signalStrength + " \n 当前网速："+ networkSpeed;
 		
 	}
 	

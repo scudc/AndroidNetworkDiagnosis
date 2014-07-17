@@ -22,6 +22,7 @@ package com.og.tracerouteping.ui;
 import android.app.Activity;
 import android.content.Context;
 import android.os.Bundle;
+import android.os.Message;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -38,12 +39,15 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import com.og.tracerouteping.R;
+import com.og.tracerouteping.network.NetworkContainer;
 import com.og.tracerouteping.network.TracerouteContainer;
 import com.og.tracerouteping.network.TracerouteWithPing;
 import com.og.tracerouteping.uitl.Utils;
 
 import java.util.ArrayList;
 import java.util.List;
+
+import org.json.JSONException;
 
 /**
  * The main activity
@@ -61,11 +65,18 @@ public class TraceActivity extends Activity {
 	private ProgressBar progressBarPing;
 	private ListView listViewTraceroute;
 	private TraceListAdapter traceListAdapter;
+	
+	
+	private ListView listViewNetwork;
+	private NetworkListAdapter networkListAdapter;
 
 	private TracerouteWithPing tracerouteWithPing;
 	private final int maxTtl = 40;
 
 	private List<TracerouteContainer> traces;
+	
+	//保存网络信息的数据接口
+	private List<NetworkContainer> networkList;
 
 	/**
 	 * onCreate, init main components from view
@@ -77,22 +88,16 @@ public class TraceActivity extends Activity {
 
 		this.tracerouteWithPing = new TracerouteWithPing(this);
 		this.traces = new ArrayList<TracerouteContainer>();
+		this.networkList = new ArrayList<NetworkContainer>();
 
 		this.buttonLaunch = (Button) this.findViewById(R.id.buttonLaunch);
 		this.editTextPing = (EditText) this.findViewById(R.id.editTextPing);
 		this.listViewTraceroute = (ListView) this.findViewById(R.id.listViewTraceroute);
 		this.progressBarPing = (ProgressBar) this.findViewById(R.id.progressBarPing);
-		
+		this.listViewNetwork = (ListView) this.findViewById(R.id.listViewNetwork);
 		
 		
 		initView();
-		
-		try {
-			Utils.getApnAndSignalStrength(this);
-		} catch (Exception e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
 		
 	}
 
@@ -109,12 +114,59 @@ public class TraceActivity extends Activity {
 					startProgressBar();
 					hideSoftwareKeyboard(editTextPing);
 					tracerouteWithPing.executeTraceroute(editTextPing.getText().toString(), maxTtl);
+					
+					/**
+					 * 调用相关获取网络信息的函数
+					 */
+					
+					new Thread(new Runnable() {
+						@Override
+						public void run() {	
+							String domain = editTextPing.getText().toString();
+							String cmd = "";
+							String result = "";
+							cmd = "ping -c 10 " + domain;
+							try {
+								result = Utils.launchCmd(cmd);
+								networkList.add(new NetworkContainer(cmd,result));
+							} catch (Exception e) {
+								// TODO Auto-generated catch block
+								e.printStackTrace();
+							}
+							
+							/*
+							cmd = "nslookup "+domain;
+							try {
+								result = Utils.launchCmd(cmd);
+								networkList.add(new NetworkContainer(cmd,result));
+							} catch (Exception e) {
+								// TODO Auto-generated catch block
+								e.printStackTrace();
+							}*/
+							
+							cmd = "Network Info";
+							try {
+								result = Utils.getApnAndSignalStrength(getApplicationContext());
+								networkList.add(new NetworkContainer(cmd,result));
+							} catch (Exception e) {
+								// TODO Auto-generated catch block
+								e.printStackTrace();
+							}
+							
+						}
+					}).start();
+					
 				}
 			}
 		});
 
 		traceListAdapter = new TraceListAdapter(getApplicationContext());
 		listViewTraceroute.setAdapter(traceListAdapter);
+		
+		this.networkListAdapter = new NetworkListAdapter(getApplicationContext());
+		listViewNetwork.setAdapter(networkListAdapter);
+		
+		
 	}
 
 	/**
@@ -206,6 +258,72 @@ public class TraceActivity extends Activity {
 			ImageView imageViewStatusPing;
 		}
 	}
+	
+	/**
+	 * The adapter of the listview (build the views)
+	 */
+	public class NetworkListAdapter extends BaseAdapter {
+
+		private Context context;
+
+		public NetworkListAdapter(Context c) {
+			context = c;
+		}
+
+		public int getCount() {
+			return networkList.size();
+		}
+
+		public NetworkContainer getItem(int position) {
+			return networkList.get(position);
+		}
+
+		public long getItemId(int position) {
+			return position;
+		}
+
+		public View getView(int position, View convertView, ViewGroup parent) {
+			ViewHolder holder;
+
+			// first init
+			if (convertView == null) {
+				LayoutInflater vi = (LayoutInflater) context.getSystemService(Context.LAYOUT_INFLATER_SERVICE);
+				convertView = vi.inflate(R.layout.item_list_network, null);
+
+
+				TextView textViewCmd = (TextView) convertView.findViewById(R.id.networkType);
+				TextView textViewResults = (TextView) convertView.findViewById(R.id.networkContent);
+				
+				// Set up the ViewHolder.
+				holder = new ViewHolder();
+				holder.textViewCmd = textViewCmd;
+				holder.textViewResult = textViewResults;
+
+				// Store the holder with the view.
+				convertView.setTag(holder);
+			} else {
+				holder = (ViewHolder) convertView.getTag();
+			}
+
+			NetworkContainer currentNetwork = getItem(position);
+
+			
+
+			Log.i("xxxxx",currentNetwork.getCmdName());
+
+			holder.textViewCmd.setText(currentNetwork.getCmdName());
+			holder.textViewResult.setText(currentNetwork.getCmdResult());
+
+			return convertView;
+		}
+
+		// ViewHolder pattern
+		class ViewHolder {
+			TextView textViewCmd;
+			TextView textViewResult;
+		}
+	}
+	
 
 	/**
 	 * Hides the keyboard
